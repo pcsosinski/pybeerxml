@@ -102,7 +102,7 @@ class Parser(object):
                             recipe.fermentables.append(fermentable)
 
                         elif ing_tag == "yeast":
-                            print("made it to yeast")
+                            #print("made it to yeast")
                             yeast = Yeast()
                             self.nodes_to_object(ing_node, yeast)
                             recipe.yeasts.append(yeast)
@@ -122,7 +122,7 @@ class Parser(object):
                     recipe.mash = mash
 
                     for mash_node in list(recipeProperty):
-                        print(mash_node.tag)
+                        #print(mash_node.tag)
                         if self.to_lower(mash_node.tag) == "mash_steps":
                             for mash_step_node in list(mash_node):
                                 mash_step = MashStep()

@@ -23,14 +23,6 @@ for recipe in recipes:
     # some general recipe properties
     print(recipe.name)
     print(recipe.brewer)
-    for yeast in recipe.yeasts:
-        print(yeast.name)
-        print(yeast.attenuation)
-    # calculated properties
-    print("OG:\n beerxml: %s\n bs est: %s\n bs actual: %s" % (recipe.og, recipe.est_og, recipe.og_measured))
-    print ("FG:\n beerxml: %s\n bs est: %s\n bs actual: %s" % (recipe.fg, recipe.est_fg, recipe.fg_measured))
-    print ("ABV:\n beerxml: %s\n bs est: %s\n bs actual: %s" % (recipe.abv, recipe.est_abv, recipe.abv_measured))    
-    #print "BH Efficiency:\n bs est: %s\n bs actual: %s" % (recipe.efficiency, recipe.actual_efficiency)
 
     #print recipe.display_boil_size
     # iterate over the ingredients
@@ -41,9 +33,14 @@ for recipe in recipes:
         #print(fermentable.name)
 	#print fermentable.amount
         #print fermentable._yield
-    for yeast in recipe.yeasts:
-        print(yeast.name)
-        print(yeast.attenuation)
+    #for yeast in recipe.yeasts:
+    #    print(yeast.name)
+    #    print(yeast.attenuation)
 
     #for misc in recipe.miscs:
         #print(misc.name)
+
+    # calculated properties
+    print("OG:\n beerxml: %s\n bs est: %s\n bs actual: %s" % (recipe.og, recipe.est_og, recipe.og_measured))
+    print ("FG:\n beerxml: %s\n bs est: %s\n bs actual: %s" % (recipe.fg, recipe.est_fg, recipe.fg_measured))
+    print ("ABV:\n beerxml: %s\n bs est: %s\n bs actual: %s" % (recipe.abv, recipe.est_abv, recipe.abv_measured)) 
