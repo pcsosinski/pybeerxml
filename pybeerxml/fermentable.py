@@ -49,8 +49,8 @@ class Fermentable(object):
     # Get the gravity units for a specific liquid volume with 100% efficiency
     def gu(self, liters=1.0):
         # gu = parts per gallon * weight in pounds / gallons
-	# BSMX has ounces, beerxml had KG for amounts
+        # BSMX has ounces, beerxml had KG for amounts
         #weight_lb = self.amount * 2.20462
-	weight_lb = self.amount/16
-	volume_gallons = liters * 0.264172
+        weight_lb = self.amount/16
+        volume_gallons = liters * 0.264172
         return self.ppg * weight_lb / volume_gallons
