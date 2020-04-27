@@ -1,8 +1,9 @@
+LITERS_IN_GAL = 3.78541
 class Recipe(object):
     def __init__(self):
-        self.name = None
+	self.name = None
         self.brewer = None
-        self.batch_size = None
+        #self.batch_size = None
         self.boil_time = None
         self.efficiency = None
         self.primary_age = None
@@ -22,6 +23,26 @@ class Recipe(object):
         self.fermentables = []
         self.miscs = []
         self.mash = None
+
+	# bsmx specific
+	self.est_abv = None
+        self.bs_actual_abv = None
+        self.est_og = None
+	self.og_measured = None
+    	self.est_fg = None
+	self.bs_actual_fg = None
+	# volumes for bsmx are measured in OUNCES for some insane reason
+	# batch size
+        self.volume_measured = None
+	self.final_vol_measured = None
+
+
+
+    @property
+    def batch_size(self):
+	gals = self.volume_measured/128
+	liters = gals * LITERS_IN_GAL
+	return liters
 
     @property
     def abv(self):
@@ -102,6 +123,9 @@ class Recipe(object):
                 mcu += f.amount * f.color * 8.3454 / self.batch_size
         return 1.4922 * (mcu**0.6859)
 
+    @property
+    def abv_measured(self):
+        return ((1.05 * (self.og_measured - self.fg_measured)) / self.fg_measured / 0.79 * 100)
 
     @ibu.setter
     def ibu(self, value):
@@ -122,3 +146,11 @@ class Recipe(object):
     @color.setter
     def color(self, value):
         pass
+
+    @batch_size.setter
+    def batch_size(self, value):
+	pass
+
+    @abv_measured.setter
+    def abv_measured(self, value):
+	pass

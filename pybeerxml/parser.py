@@ -10,6 +10,12 @@ from .fermentable import Fermentable
 import sys
 
 
+bsmx_overrides = {
+	"abv": "bs_actual_abv",
+	"og": "bs_actual_og",
+	"fg": "bs_actual_fg",
+}
+ 
 class Parser(object):
 
     def nodes_to_object(self, node, object):
@@ -21,8 +27,14 @@ class Parser(object):
     def node_to_object(self, node, object):
         "Map a single node to an object's attributes"
 
-        attribute = self.to_lower(node.tag)
-
+        tag = self.to_lower(node.tag)
+	if tag.startswith('f_'):		
+		tag = tag[tag.find('_', 2)+1:]
+        try:
+		attribute = bsmx_overrides[tag]
+		print "yay: " + attribute
+	except KeyError:
+		attribute = tag
         # Yield is a protected keyword in Python, so let's rename it
         attribute = "_yield" if attribute == "yield" else attribute
 
@@ -42,61 +54,88 @@ class Parser(object):
 
         recipes = []
 
+        parser = ElementTree.XMLParser()
+        parser.parser.UseForeignDTD(True)
+# in case you want to parse cloud.bsmx directly
+# but probably not
+        parser.entity["lsquo"] = "'"
+        parser.entity["rsquo"] = "'"
+        parser.entity["deg"] = "*"
+        parser.entity["ldquo"] = '"'
+        parser.entity["rdquo"] = '"'
+        parser.entity["uuml"] = "u"
+        parser.entity["auml"] = "a"
+        parser.entity["ndash"] = "-"
+        parser.entity["ouml"] = "o"
+        parser.entity["reg"] = "R"
+        parser.entity["trade"] = "TM"
+        parser.entity["ccedil"] = ""
+        parser.entity["AElig"] = ""
         with open(xml_file, "rt") as f:
-            tree = ElementTree.parse(f)
+	    #tree = ElementTree.parse(f)
+            etree = ElementTree.ElementTree()
+
+            tree = etree.parse(f, parser=parser)
 
         for recipeNode in tree.iter():
+            #print recipeNode.tag
             if self.to_lower(recipeNode.tag) != "recipe":
                 continue
 
             recipe = Recipe()
             recipes.append(recipe)
-
             for recipeProperty in list(recipeNode):
-                tag_name = self.to_lower(recipeProperty.tag)
+ 		tag_name = self.to_lower(recipeProperty.tag)
+                if tag_name.startswith('f_'):
+		  tag_name = tag_name[tag_name.find('_', 2)+1:]
+                  print tag_name
 
-                if tag_name == "fermentables":
-                    for fermentable_node in list(recipeProperty):
-                        fermentable = Fermentable()
-                        self.nodes_to_object(fermentable_node, fermentable)
-                        recipe.fermentables.append(fermentable)
+                if tag_name == "ingredients":
+                    print "made it to ingredients!"
+		    for ing_node in list(recipeProperty.find('Data')):
+                 	ing_tag = self.to_lower(ing_node.tag)
+			print ing_tag
+		        if ing_tag == "grain":
+       				print "made it to grain!"
+				fermentable = Fermentable()
+                    		self.nodes_to_object(ing_node, fermentable)
+                    		recipe.fermentables.append(fermentable)
 
-                elif tag_name == "yeasts":
-                    for yeast_node in list(recipeProperty):
-                        yeast = Yeast()
-                        self.nodes_to_object(yeast_node, yeast)
-                        recipe.yeasts.append(yeast)
+                	elif ing_tag == "yeast":
+                    		print "made it to yeast"
+                        	yeast = Yeast()
+                        	self.nodes_to_object(ing_node, yeast)
+                        	recipe.yeasts.append(yeast)
 
-                elif tag_name == "hops":
-                    for hop_node in list(recipeProperty):
-                        hop = Hop()
-                        self.nodes_to_object(hop_node, hop)
-                        recipe.hops.append(hop)
+                	elif ing_tag == "hops":
+                        	hop = Hop()
+                        	self.nodes_to_object(ing_node, hop)
+                        	recipe.hops.append(hop)
 
-                elif tag_name == "miscs":
-                    for misc_node in list(recipeProperty):
-                        misc = Misc()
-                        self.nodes_to_object(misc_node, misc)
-                        recipe.miscs.append(misc)
+                	elif ing_tag == "misc":
+                        	misc = Misc()
+                        	self.nodes_to_object(ing_node, misc)
+                        	recipe.miscs.append(misc)
 
-                elif tag_name == "style":
-                    style = Style()
-                    recipe.style = style
-                    self.nodes_to_object(recipeProperty, style)
+		# moved to FS_DESCRIPTION or such
+                #elif tag_name == "style":
+                #    style = Style()
+                #    recipe.style = style
+                #    self.nodes_to_object(recipeProperty, style)
 
                 elif tag_name == "mash":
                     mash = Mash()
                     recipe.mash = mash
 
                     for mash_node in list(recipeProperty):
+			print mash_node.tag
                         if self.to_lower(mash_node.tag) == "mash_steps":
                             for mash_step_node in list(mash_node):
                                 mash_step = MashStep()
                                 self.nodes_to_object(mash_step_node, mash_step)
-                                mash.steps.append(mash_step)
+ 				mash.steps.append(mash_step)
                         else:
                             self.nodes_to_object(mash_node, mash)
-
                 else:
                     self.node_to_object(recipeProperty, recipe)
 
