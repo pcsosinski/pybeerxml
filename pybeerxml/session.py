@@ -1,19 +1,39 @@
+LITERS_IN_GAL = 3.78541
+ 
 class Session(object):
-  def __init__(self):
-    self.name = None
+    def __init__(self):
+        self.name = None
 
-    self.mash_ph = None
-    self.bs_mash_eff = None
+        self.mash_ph = None
 
-    self.preboil_vol = None
-    self.preboil_gravity = None
+        # pre boil volume in OZ
+        self.boil_vol_measured = None
+        self.og_boil_measured = None
 
-    self.batch_size = None
-    self.og = None
+        self.og_measured = None
+        # batch (into fermenter) volume in OZ
+        self.volume_measured = None
 
-    self.bs_efficency = None
+        self.fg_measured = None
+        # bottling volume in OZ
+        self.final_vol_measured = None
 
-    self.fg = None
-    self.bottling_vol = None
+    #(TODO) rename to into_ferm or somethng
+    @property
+    def batch_size(self):
+        gals = self.final_vol_measured/128
+        return gals * LITERS_IN_GAL
 
-    self.attenuation = None
+    @property
+    def attenuation(self):
+        return ((self.og_measured - self.fg_measured) / (self.og_measured - 1)) * 100
+
+    @batch_size.setter
+    def batch_size(self, value):
+        pass
+
+    @attenuation.setter
+    def attenuation(self, value):
+        pass
+
+

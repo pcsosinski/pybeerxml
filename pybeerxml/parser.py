@@ -7,6 +7,7 @@ from .misc import Misc
 from .yeast import Yeast
 from .style import Style
 from .fermentable import Fermentable
+from .session import Session
 import sys
 
 
@@ -15,6 +16,16 @@ bsmx_overrides = {
         "og": "bs_actual_og",
         "fg": "bs_actual_fg",
 }
+
+session_variables = [
+        'mash_ph',
+        'boil_vol_measured', # ounces preboil
+        'og_boil_measured', # pre boil gravity
+        'volume_measured', # ???
+        'og_measured', # Measured OG
+        'final_vol_measured', # batch size into ferm (oz)
+        'fg_measured', # Measured FG
+        ]
  
 class Parser(object):
 
@@ -32,8 +43,9 @@ class Parser(object):
             tag = tag[tag.find('_', 2)+1:]
         try:
             attribute = bsmx_overrides[tag]
-            print("yay: " + attribute)
+            #print("yay: " + attribute)
         except KeyError:
+            #print("boo: " + tag)
             attribute = tag
         # Yield is a protected keyword in Python, so let's rename it
         attribute = "_yield" if attribute == "yield" else attribute
@@ -55,41 +67,38 @@ class Parser(object):
         recipes = []
 
         parser = ElementTree.XMLParser()
-#        parser.parser.UseForeignDTD(True)
-# in case you want to parse cloud.bsmx directly
-# but probably not
-#        parser.entity["lsquo"] = "'"
-#        parser.entity["rsquo"] = "'"
-#        parser.entity["deg"] = "*"
-#        parser.entity["ldquo"] = '"'
-#        parser.entity["rdquo"] = '"'
-#        parser.entity["uuml"] = "u"
-#        parser.entity["auml"] = "a"
-#        parser.entity["ndash"] = "-"
-#        parser.entity["ouml"] = "o"
-#        parser.entity["reg"] = "R"
-#        parser.entity["trade"] = "TM"
-#        parser.entity["ccedil"] = ""
-#        parser.entity["AElig"] = ""
         with open(xml_file, "rt") as f:
             tree = ElementTree.parse(f)
-            #etree = ElementTree.ElementTree()
 
-            #tree = etree.parse(f, parser=parser)
-
-        for recipeNode in tree.iter():
-            #print recipeNode.tag
-            if self.to_lower(recipeNode.tag) != "recipe":
+        # get table IDs for the folders
+        # we want folders named "Brew Sessions"
+        brew_session_table_ids = []
+        for table in tree.iter():
+            if table.tag == "Table":
+                if table.find('Name').text == "Brew Sessions":
+                    brew_session_table_ids.append(table.find("TExtra").text)
+        for recipeHeader in tree.iter():
+            if self.to_lower(recipeHeader.tag) != "cloud":
                 continue
-
+            # make sure this cloud header is a recipe
+            if not recipeHeader.find("F_C_RECIPE"):
+                continue
+            if recipeHeader.find("F_C_FOLDER_ID").text not in brew_session_table_ids:
+                continue
+            recipeNode = recipeHeader.find("F_C_RECIPE")
             recipe = Recipe()
+            recipe.est_og = float(recipeHeader.find("F_R_OG").text)
+            recipe.est_fg = float(recipeHeader.find("F_R_FG").text)
+            recipe.est_abv = float(recipeHeader.find("F_R_EST_ABV").text)
+            recipe.volume = float(recipeHeader.find("F_R_VOLUME").text)
+            recipe.efficiency = float(recipeHeader.find("F_R_EFFICIENCY").text)
+            recipe.est_boil_vol = float(recipeHeader.find("F_R_BOIL_VOL").text)
             recipes.append(recipe)
             for recipeProperty in list(recipeNode):
                 tag_name = self.to_lower(recipeProperty.tag)
                 if tag_name.startswith('f_'):
                     tag_name = tag_name[tag_name.find('_', 2)+1:]
-                    #print(tag_name)
-
+                    #print("%s: %s" % (tag_name, recipeProperty.text))
                 if tag_name == "ingredients":
                     #print("made it to ingredients!")
                     for ing_node in list(recipeProperty.find('Data')):
@@ -130,6 +139,15 @@ class Parser(object):
                                 mash.steps.append(mash_step)
                         else:
                             self.nodes_to_object(mash_node, mash)
+                elif tag_name in session_variables:
+                    if recipe.session:
+                        session = recipe.session
+                    else:
+                        session = Session()
+                        recipe.session = session
+                    #print(tag_name)
+                    self.node_to_object(recipeProperty, session)
+
                 else:
                     self.node_to_object(recipeProperty, recipe)
 
