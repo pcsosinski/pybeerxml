@@ -1,5 +1,6 @@
 import re
 
+OZ_TO_KG = 0.0283495
 
 class Fermentable(object):
     # Regular expressions to match for boiling sugars (DME, LME, etc).
@@ -8,10 +9,19 @@ class Fermentable(object):
 
     def __init__(self):
         self.name = None
+        # bsmx has this in oz
         self.amount = None
         self._yield = None
         self.color = None
         self._add_after_boil = None  # Should be Bool
+
+    @property
+    def amount_kg(self):
+        return self.amount * OZ_TO_KG
+
+    @amount_kg.setter
+    def amount_kg(self, value):
+        pass
 
     @property
     def add_after_boil(self):
@@ -20,7 +30,9 @@ class Fermentable(object):
     @add_after_boil.setter
     def add_after_boil(self, value):
         self._add_after_boil = value
-
+    
+    # fucking magic number
+    # probably http://howtobrew.com/book/section-2/what-is-malted-grain/table-of-typical-malt-yields
     @property
     def ppg(self):
         return 0.46214 * self._yield
@@ -54,3 +66,10 @@ class Fermentable(object):
         weight_lb = self.amount/16
         volume_gallons = liters * 0.264172
         return self.ppg * weight_lb / volume_gallons
+
+    # return the number of points this weight of grain is capable of
+    # using weight in lbs
+    def points(self):
+        weight_lb = self.amount/16
+        return self.ppg * weight_lb
+

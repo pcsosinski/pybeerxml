@@ -11,19 +11,13 @@ from .session import Session
 import sys
 
 
-bsmx_overrides = {
-        "abv": "bs_actual_abv",
-        "og": "bs_actual_og",
-        "fg": "bs_actual_fg",
-}
-
 session_variables = [
         'mash_ph',
         'boil_vol_measured', # ounces preboil
         'og_boil_measured', # pre boil gravity
-        'volume_measured', # ???
+        'volume_measured', # batch size into ferm
         'og_measured', # Measured OG
-        'final_vol_measured', # batch size into ferm (oz)
+        'final_vol_measured', # bottling amount (oz)
         'fg_measured', # Measured FG
         ]
  
@@ -40,12 +34,8 @@ class Parser(object):
 
         tag = self.to_lower(node.tag)
         if tag.startswith('f_'):
-            tag = tag[tag.find('_', 2)+1:]
-        try:
-            attribute = bsmx_overrides[tag]
-            #print("yay: " + attribute)
-        except KeyError:
-            #print("boo: " + tag)
+            attribute = tag[tag.find('_', 2)+1:]
+        else:
             attribute = tag
         # Yield is a protected keyword in Python, so let's rename it
         attribute = "_yield" if attribute == "yield" else attribute
@@ -91,7 +81,7 @@ class Parser(object):
             recipe.est_fg = float(recipeHeader.find("F_R_FG").text)
             recipe.est_abv = float(recipeHeader.find("F_R_EST_ABV").text)
             recipe.volume = float(recipeHeader.find("F_R_VOLUME").text)
-            recipe.efficiency = float(recipeHeader.find("F_R_EFFICIENCY").text)
+            recipe.efficiency = float(recipeHeader.find("F_R_EFFICIENCY").text)/100
             recipe.est_boil_vol = float(recipeHeader.find("F_R_BOIL_VOL").text)
             recipes.append(recipe)
             for recipeProperty in list(recipeNode):
