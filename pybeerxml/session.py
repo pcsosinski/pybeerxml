@@ -18,6 +18,13 @@ class Session(object):
         # bottling volume in OZ
         self.final_vol_measured = None
 
+        # bs date
+        # format is YYYY-MM-DD
+        self.bs_date = None
+
+        # equipment info for session
+        self.equipment = None
+
     #(TODO) rename to into_ferm or somethng
     @property
     def batch_size(self):

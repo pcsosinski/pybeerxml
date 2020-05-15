@@ -8,6 +8,7 @@ from .yeast import Yeast
 from .style import Style
 from .fermentable import Fermentable
 from .session import Session
+from .equipment import Equipment
 import sys
 
 
@@ -19,6 +20,7 @@ session_variables = [
         'og_measured', # Measured OG
         'final_vol_measured', # bottling amount (oz)
         'fg_measured', # Measured FG
+        'date', # Brew date
         ]
  
 class Parser(object):
@@ -115,6 +117,17 @@ class Parser(object):
                             misc = Misc()
                             self.nodes_to_object(ing_node, misc)
                             recipe.miscs.append(misc)
+
+                elif tag_name == "equipment":
+                    if recipe.session:
+                        session = recipe.session
+                    else:
+                        session = Session()
+                        recipe.session = session
+
+                    equip = Equipment()
+                    session.equipment = equip
+                    self.nodes_to_object(recipeProperty, equip)
 
                 elif tag_name == "mash":
                     mash = Mash()

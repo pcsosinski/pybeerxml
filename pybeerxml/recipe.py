@@ -10,6 +10,9 @@ def oz_to_liter(ounces):
 def liter_to_gal(liters):
     return liters/LITERS_IN_GAL
 
+def gravity_to_parts(gravity):
+    return (gravity - 1) * 1000
+
 class Recipe(object):
     def __init__(self):
         self.name = None
@@ -50,37 +53,85 @@ class Recipe(object):
     # stat object for recipe.  not sure if this is overkill.
     class stat_obj(object):
         def __init__(self):
+            self.name = None
             self.bs_exp = None
             self.bxml_exp = None
             self.measured = None
             self.precision = None
 
-        def __init__(self, bs_exp, bxml_exp, measured, precision=3):
+        def __init__(self, name, bs_exp, bxml_exp, measured, precision=3):
+            self.name = name
             self.bs_exp = bs_exp
             self.bxml_exp = bxml_exp
             self.measured = measured
             self.precision = precision
 
+        def _delta(self, which):
+            if which == "bs":
+                a = self.bs_exp
+            elif which == "bxml":
+                a = self.bxml_exp
+            else:
+                print("Invalid delta type")
+                return None
+            b = self.measured
+            if not a or not b:
+                return None
+            mod_a = a
+            mod_b = b
+            if "gravity" in self.name:
+                mod_a = gravity_to_parts(a)
+                mod_b = gravity_to_parts(b)
+            if a > b:
+                return (-1.0 * (1 - mod_b/mod_a))
+            return (1 - mod_a/mod_b)
+
+
+        # return the delta between measured and brewsmith expected as a float
+        # ie -0.05 means the measured value was 5% lower than the beersmith expected value
+        @property
+        def bs_delta(self):
+            return self._delta("bs")
+
+        @property
+        def bxml_delta(self):
+            return self._delta("bxml")
+
+        def csv_fields(self):
+            return ["bs_exp", "bxml_exp", "measured", "bs_delta", "bxml_delta"]
+
+        def csv_values(self):
+            # this ordering needs to match csv_fields
+            return [self.bs_exp, self.bxml_exp, self.measured, self.bs_delta, self.bxml_delta]
+
+        # TODO fix
+        def csv_header(self):
+            return "stat name,brewsmith_expected,beerxml expected,measured,beersmith_delta,beerxml_delta,precision".split(",")
+
+        def to_list(self):
+            return ([self.name, self.bs_exp, self.bxml_exp, self.measured, self.bs_delta, self.bxml_delta, self.precision])
+
+
     # generate stats for this recipe & session
     # exp vs measured
     def build_stats(self):
-        stats = {}
+        stats = []
 
-        stats["original_gravity"] = self.stat_obj(self.est_og, self.og, self.session.og_measured)
-        stats["final_gravity"] = self.stat_obj(self.est_fg, self.fg, self.session.fg_measured)
-        stats["abv"] = self.stat_obj(self.est_abv, self.abv, self.abv_measured, 1)
-        stats["fermenter_volume_gal"] = self.stat_obj(liter_to_gal(self.batch_size),
-                None, liter_to_gal(self.session.batch_size), 2)
-        stats["preboil_volume_gal"] = self.stat_obj(self.est_boil_vol/128, None, self.session.boil_vol_measured/128, 2)
-        stats["preboil_gravity"] = self.stat_obj(None, None, self.session.og_boil_measured)
-        stats["bottling_volume_gal"] = self.stat_obj(None, None, self.session.final_vol_measured/128, 2)
-        stats["mash_efficiency"] = self.stat_obj(self.expected_mash_efficiency, None, self.measured_mash_efficiency, 2)
-        stats["bh_efficiency"] = self.stat_obj(self.efficiency, None, self.measured_bhe, 2)
+        stats.append(self.stat_obj("original_gravity", self.est_og, self.og, self.session.og_measured))
+        stats.append(self.stat_obj("final_gravity", self.est_fg, self.fg, self.session.fg_measured))
+        stats.append(self.stat_obj("abv", self.est_abv, self.abv, self.abv_measured, 1))
+        stats.append(self.stat_obj("fermenter_volume_gal", liter_to_gal(self.batch_size),
+                None, liter_to_gal(self.session.batch_size), 2))
+        stats.append(self.stat_obj("preboil_volume_gal", self.est_boil_vol/128, None, self.session.boil_vol_measured/128, 2))
+        stats.append(self.stat_obj("preboil_gravity", None, self.expected_preboil_gravity, self.session.og_boil_measured))
+        stats.append(self.stat_obj("bottling_volume_gal", None, None, self.session.final_vol_measured/128, 2))
+        stats.append(self.stat_obj("mash_efficiency", self.expected_mash_efficiency, None, self.measured_mash_efficiency, 2))
+        stats.append(self.stat_obj("bh_efficiency", self.efficiency, None, self.measured_bhe, 2))
         max_att = 0
         for yeast in self.yeasts:
             if yeast.attenuation > max_att:
                 max_att = yeast.attenuation
-        stats["attenuation"] = self.stat_obj(max_att/100, None, self.session.attenuation/100, 2)
+        stats.append(self.stat_obj("attenuation", max_att/100, None, self.session.attenuation/100, 2))
 
         return stats
 
@@ -92,8 +143,8 @@ class Recipe(object):
             mod_a = a
             mod_b = b
             if "gravity" in name:
-                mod_a = self.gravity_to_parts(a)
-                mod_b = self.gravity_to_parts(b)
+                mod_a = gravity_to_parts(a)
+                mod_b = gravity_to_parts(b)
             if a > b:
                 percent = "%.0f%%" % ((1 - mod_b/mod_a) * 100)
             else:
@@ -102,20 +153,49 @@ class Recipe(object):
 
     def stats_pretty(self):
         stats = self.build_stats()
-        for s, i in stats.items():
-            print("** %s **" % s)
-            prec = i.precision
+        for s in stats:
+            print("** %s **" % s.name)
+            prec = s.precision
             delta = ""
-            if i.measured:
-                print("  Measured: %.*f" % (prec, i.measured))
-            if i.bs_exp:
-                delta = self._delta_str(s, i.measured, i.bs_exp, prec)
-                print("  Beersmith expected: %.*f  %s" % (prec, i.bs_exp, delta))
-            if i.bxml_exp:
-                delta = self._delta_str(s, i.measured, i.bxml_exp, prec)
-                print("  BeerXML expected: %.*f  %s" % (prec, i.bxml_exp, delta))
+            if s.measured:
+                print("  Measured: %.*f" % (prec, s.measured))
+            if s.bs_exp:
+                delta = self._delta_str(s.name, s.measured, s.bs_exp, prec)
+                print("  Beersmith expected: %.*f  %s" % (prec, s.bs_exp, delta))
+            if s.bxml_exp:
+                delta = self._delta_str(s.name, s.measured, s.bxml_exp, prec)
+                print("  BeerXML expected: %.*f  %s" % (prec, s.bxml_exp, delta))
+
+    def stats_csv2(self, header=False):
+        stats = self.build_stats()
+        stat_csv = []
+        if header:
+            h = ["recipe_name", "brew_date"]
+        stat = [self.name, self.session.date]
+        for s in stats:
+            if header:
+                for field in s.csv_fields():
+                    h.append("%s_%s" % (s.name, field))
+            stat.extend(s.csv_values())
+        if header:
+            return [h, stat]
+        else:
+            return [stat]
 
 
+    def stats_csv(self, header=False):
+        stats = self.build_stats()
+        stat_csv = []
+        for s in stats:
+            if header:
+                h = ["recipe name"]
+                h.extend(s.csv_header())
+                stat_csv.append(h)
+                header = False
+            stat = [self.name]
+            stat.extend(s.to_list())
+            stat_csv.append(stat)
+        return stat_csv
         
     def _fermentable_points(self):
         points = 0
@@ -125,7 +205,7 @@ class Recipe(object):
 
     @property
     def measured_bhe(self):
-        m_og_pts = self.gravity_to_parts(self.session.og_measured)
+        m_og_pts = gravity_to_parts(self.session.og_measured)
         return ((self.session.batch_size_gal * m_og_pts) /
                 self._fermentable_points())
 
@@ -160,16 +240,23 @@ class Recipe(object):
 
         return _ibu
 
-    #TODO  move to support lib
-    def gravity_to_parts(self, gravity):
-        return (gravity - 1) * 1000
+    @property
+    def expected_preboil_gravity(self):
+        vol_g = liter_to_gal(self.batch_size + self.session.equipment.boil_off_l)
+        points = (self._fermentable_points() * self.efficiency) / vol_g
+        return (1 + points/1000)
 
-    #TODO figure out how brewsmith does this, probably some calculation of potential with boil off, based on Brewhouse.  ugg.
+    # any difference from this and preboil?
+    # top off I guess
+    @property
+    def expected_post_mash_gravity(self):
+        pass
+
     @property
     def expected_mash_efficiency(self):
-        est_og_parts = self.gravity_to_parts(self.est_og)
-        est_boil_gal = self.est_boil_vol/128 
-        return (est_og_parts * est_boil_gal / self._fermentable_points())
+        vol = self.session.equipment.pre_boil_vol(self.batch_size)
+        gravity_parts = gravity_to_parts(self.expected_preboil_gravity)
+        return (vol * gravity_parts) / (self.total_gu * self.batch_size)
 
     @expected_mash_efficiency.setter
     def expected_mash_efficiency(self, value):
@@ -178,13 +265,21 @@ class Recipe(object):
     # src: https://beersmith.com/blog/2014/11/05/brewhouse-efficiency-vs-mash-efficiency-in-all-grain-beer-brewing/
     @property
     def measured_mash_efficiency(self):
-        og_boil_parts = self.gravity_to_parts(self.session.og_boil_measured)
+        og_boil_parts = gravity_to_parts(self.session.og_boil_measured)
         return ((og_boil_parts) * self.session.boil_size_gal /
                 self._fermentable_points())
 
     @measured_mash_efficiency.setter
     def measured_mash_efficiency(self, value):
         pass
+
+    @property
+    def total_gu(self):
+        # Max efficiency points of the grain bill.
+        gu = 0
+        for f in self.fermentables:
+            gu += f.gu(liters=self.batch_size)
+        return gu
 
     @property
     def og(self):
