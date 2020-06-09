@@ -19,6 +19,6 @@ with open("session_data.csv", 'w', newline='') as csvfile:
         print("Writing %s" % recipe.name)
         spamwriter.writerows(recipe.stats_csv2(header=header))
         header = False
-        if recipe.name == "Rings of Light - BIAB - BnW - 3/13/20":
-            recipe.stats_pretty()
+        #if recipe.name == "Rings of Light - BIAB - BnW - 3/13/20":
+        #    recipe.stats_pretty()
 

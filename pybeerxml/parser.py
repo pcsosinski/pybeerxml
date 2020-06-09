@@ -79,12 +79,14 @@ class Parser(object):
                 continue
             recipeNode = recipeHeader.find("F_C_RECIPE")
             recipe = Recipe()
+            # TODO(fix all this shit)
             recipe.est_og = float(recipeHeader.find("F_R_OG").text)
             recipe.est_fg = float(recipeHeader.find("F_R_FG").text)
             recipe.est_abv = float(recipeHeader.find("F_R_EST_ABV").text)
             recipe.volume = float(recipeHeader.find("F_R_VOLUME").text)
             recipe.efficiency = float(recipeHeader.find("F_R_EFFICIENCY").text)/100
             recipe.est_boil_vol = float(recipeHeader.find("F_R_BOIL_VOL").text)
+            recipe.boil_time = float(recipeHeader.find("F_R_BOIL_TIME").text)
             recipes.append(recipe)
             for recipeProperty in list(recipeNode):
                 tag_name = self.to_lower(recipeProperty.tag)

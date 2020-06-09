@@ -83,9 +83,8 @@ class Recipe(object):
                 mod_a = gravity_to_parts(a)
                 mod_b = gravity_to_parts(b)
             if a > b:
-                return (-1.0 * (1 - mod_b/mod_a))
-            return (1 - mod_a/mod_b)
-
+                return (-1.0 * (mod_a - mod_b) / mod_a)
+            return 1 + ((mod_b - mod_a) / mod_a)
 
         # return the delta between measured and brewsmith expected as a float
         # ie -0.05 means the measured value was 5% lower than the beersmith expected value
@@ -115,7 +114,24 @@ class Recipe(object):
     # generate stats for this recipe & session
     # exp vs measured
     def build_stats(self):
+        # measured and expected stats
         stats = []
+        # details about the brew that don't have expected
+        # like equip, boil time
+        details = {}
+        # ident is name, date
+        ident = {}
+        recipe_dict = {
+                'ident': ident,
+                'details': details,
+                'stats': stats
+                }
+        ident['recipe_name'] = self.name
+        ident['brew_date'] = self.session.date
+
+        details['kettle'] = self.session.equipment.name
+        details['kettle_vol'] = self.session.equipment.mash_vol_g
+        details['boil_time'] = self.boil_time
 
         stats.append(self.stat_obj("original_gravity", self.est_og, self.og, self.session.og_measured))
         stats.append(self.stat_obj("final_gravity", self.est_fg, self.fg, self.session.fg_measured))
@@ -132,8 +148,29 @@ class Recipe(object):
             if yeast.attenuation > max_att:
                 max_att = yeast.attenuation
         stats.append(self.stat_obj("attenuation", max_att/100, None, self.session.attenuation/100, 2))
+        
+        stats.append(self.stat_obj(
+            "eq_loss",
+            liter_to_gal(self.session.exp_bh_loss(self.batch_size, self.boil_time)),
+            None,
+            self.session.boil_size_gal - self.session.batch_size_gal
+            ))
 
-        return stats
+        stats.append(self.stat_obj(
+            "boil_off",
+            liter_to_gal(self.session.equipment.boil_off_l(self.boil_time)),
+            None,
+            self.session.measured_boil_off,
+            2))
+
+        stats.append(self.stat_obj(
+            "hourly_boil_off",
+            liter_to_gal(self.session.equipment.boil_off_hourly_l),
+            None,
+            self.session.measured_hourly_boil_off(self.boil_time),
+            2)) 
+        
+        return recipe_dict
 
     # refactor
     def _delta_str(self, name, a, b, prec):
@@ -151,6 +188,7 @@ class Recipe(object):
                 percent = "-%.0f%%" % ((1 - mod_a/mod_b) * 100)
         return delta_format % (prec, a - b, percent)
 
+    # TODO: fix delta formatting
     def stats_pretty(self):
         stats = self.build_stats()
         for s in stats:
@@ -161,22 +199,25 @@ class Recipe(object):
                 print("  Measured: %.*f" % (prec, s.measured))
             if s.bs_exp:
                 delta = self._delta_str(s.name, s.measured, s.bs_exp, prec)
-                print("  Beersmith expected: %.*f  %s" % (prec, s.bs_exp, delta))
+                print("  Beersmith expected: %.*f  %.0f%%" % (prec, s.bs_exp, s.bs_delta))
             if s.bxml_exp:
                 delta = self._delta_str(s.name, s.measured, s.bxml_exp, prec)
-                print("  BeerXML expected: %.*f  %s" % (prec, s.bxml_exp, delta))
+                print("  BeerXML expected: %.*f  %.0f%%" % (prec, s.bxml_exp, s.bxml_delta))
 
     def stats_csv2(self, header=False):
-        stats = self.build_stats()
-        stat_csv = []
+        recipe_dict = self.build_stats()
+        stat = []
+        h = []
         if header:
-            h = ["recipe_name", "brew_date"]
-        stat = [self.name, self.session.date]
-        for s in stats:
+            h.extend(recipe_dict['ident'].keys())
+        stat.extend(recipe_dict['ident'].values())
+        for s in recipe_dict['stats']:
             if header:
                 for field in s.csv_fields():
                     h.append("%s_%s" % (s.name, field))
             stat.extend(s.csv_values())
+        h.extend(recipe_dict['details'].keys())
+        stat.extend(recipe_dict['details'].values())
         if header:
             return [h, stat]
         else:
@@ -242,7 +283,7 @@ class Recipe(object):
 
     @property
     def expected_preboil_gravity(self):
-        vol_g = liter_to_gal(self.batch_size + self.session.equipment.boil_off_l)
+        vol_g = liter_to_gal(self.batch_size + self.session.equipment.boil_off_l(self.boil_time))
         points = (self._fermentable_points() * self.efficiency) / vol_g
         return (1 + points/1000)
 
@@ -254,7 +295,7 @@ class Recipe(object):
 
     @property
     def expected_mash_efficiency(self):
-        vol = self.session.equipment.pre_boil_vol(self.batch_size)
+        vol = self.session.equipment.pre_boil_vol(self.batch_size, self.boil_time)
         gravity_parts = gravity_to_parts(self.expected_preboil_gravity)
         return (vol * gravity_parts) / (self.total_gu * self.batch_size)
 
